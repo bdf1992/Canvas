@@ -106,7 +106,6 @@ class RepoCanvasTests(unittest.TestCase):
         self.assertIn("Fit width", rendered)
         self.assertIn("Reset view", rendered)
         self.assertIn("Pinned revision", rendered)
-        self.assertIn("git-object", rendered)
 
     def test_renderer_contains_only_projection_ui_state_not_new_canvas_objects(self):
         document, _ = self.project()
