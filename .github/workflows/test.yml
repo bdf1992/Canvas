@@ -1,0 +1,20 @@
+name: Canvas 0.1 witness
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  standalone-grounded-field:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run standalone tests
+        run: python -m unittest -v tests.test_canvas01
+      - name: Validate fixture
+        run: python canvas01.py validate fixtures/grounded-field.canvas.json
+      - name: Resolve grounding path
+        run: python canvas01.py ground-path fixtures/grounded-field.canvas.json object-note --root .
