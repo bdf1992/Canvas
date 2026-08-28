@@ -28,6 +28,12 @@ Renderer  -> turns resolved things into visible Cards
 
 A Projector is not a new durable Canvas object. A text renderer, HTML renderer, image renderer, etc. are likewise presentation strategies, not `TextCard`, `HtmlCard`, or other semantic object classes.
 
+## Interaction design
+
+The interaction surface follows [DESIGN.md](DESIGN.md): content before chrome, readable focus before fit-all completeness, wheel-to-zoom, empty-space drag-to-pan, contextual inspection, and search-as-navigation.
+
+The primary field renderer is `field_view.py`. It renders the exact portable Canvas document without changing its semantics.
+
 ## 0.1 — Grounded Field
 
 The standalone implementation can:
@@ -48,13 +54,15 @@ The durable 0.1 vocabulary remains `Canvas`, `Board` (historical placement surfa
 
 ## Task 1 — Repository as Canvas field
 
-`repo_canvas.py` projects an exact local Git revision into the Canvas field without widening the 0.1 semantic object grammar.
+`repo_canvas.py` projects an exact local Git revision into the Canvas field without widening the 0.1 semantic object grammar. `field_view.py` renders that field through the interaction design system.
 
 ```bash
 python repo_canvas.py project /path/to/repo \
   --source-id owner/repo \
-  --output repo.canvas.json \
-  --html repo.canvas.html
+  --output repo.canvas.json
+
+python field_view.py repo.canvas.json /path/to/repo \
+  --output repo.canvas.html
 
 python repo_canvas.py verify repo.canvas.json /path/to/repo \
   --source-id owner/repo
@@ -97,4 +105,4 @@ Canvas core
        └─ optional Soveraeign
 ```
 
-See [SPEC.md](SPEC.md) for the contract and [ROADMAP.md](ROADMAP.md) for the progression to 1.0.
+See [SPEC.md](SPEC.md) for the contract, [DESIGN.md](DESIGN.md) for the interaction philosophy, and [ROADMAP.md](ROADMAP.md) for the progression to 1.0.

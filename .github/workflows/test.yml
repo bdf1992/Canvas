@@ -34,16 +34,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Run repository projection and card-rendering tests
-        run: python -m unittest -v tests.test_repo_canvas
+      - name: Run repository, card, and field-design tests
+        run: python -m unittest -v tests.test_repo_canvas tests.test_field_view
       - name: Project this exact Canvas revision into the Canvas field
         run: |
           mkdir -p artifacts
           python repo_canvas.py project . \
             --source-id bdf1992/Canvas \
             --output artifacts/canvas.canvas.json \
-            --html artifacts/canvas.html \
             | tee artifacts/summary.json
+      - name: Render with the Canvas interaction design system
+        run: python field_view.py artifacts/canvas.canvas.json . --output artifacts/canvas.html
       - name: Validate portable Canvas contract
         run: python canvas01.py validate artifacts/canvas.canvas.json
       - name: Resolve every projected Canvas Git object
