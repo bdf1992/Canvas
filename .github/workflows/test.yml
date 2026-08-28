@@ -25,7 +25,7 @@ jobs:
       - name: Resolve grounding path
         run: python canvas01.py ground-path fixtures/grounded-field.canvas.json object-note --root .
 
-  canvas-directory-board:
+  canvas-first-board:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,8 +34,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Run repository, Card capability, and Directory Board tests
-        run: python -m unittest -v tests.test_repo_canvas tests.test_field_view tests.test_directory_board
+      - name: Run repository, Card, and generic Board tests
+        run: python -m unittest -v tests.test_repo_canvas tests.test_field_view tests.test_board_view
       - name: Project this exact Canvas revision into the repository field
         run: |
           mkdir -p artifacts
@@ -43,31 +43,40 @@ jobs:
             --source-id bdf1992/Canvas \
             --output artifacts/canvas.field.json \
             | tee artifacts/field-summary.json
-      - name: Derive and render the first premise-bearing Directory Board
+      - name: Author first Board from Cards and contains relations
         run: |
-          python directory_board.py build artifacts/canvas.field.json \
-            --output artifacts/directory-board.canvas.json \
-            --html artifacts/directory-board.html \
+          python board_view.py build artifacts/canvas.field.json \
+            --board-id repository-containment \
+            --label "Directory Board" \
+            --premise "What exists here, and how is it contained?" \
+            --relation contains \
+            --repo . \
+            --output artifacts/board.canvas.json \
+            --html artifacts/board.html \
             | tee artifacts/board-summary.json
-      - name: Validate portable Directory Board contract
-        run: python canvas01.py validate artifacts/directory-board.canvas.json
-      - name: Resolve every grounded repository Object on the Board
+      - name: Validate portable Board contract
+        run: python canvas01.py validate artifacts/board.canvas.json
+      - name: Resolve every grounded Card Object on the Board
         run: |
-          python repo_canvas.py verify artifacts/directory-board.canvas.json . \
+          python repo_canvas.py verify artifacts/board.canvas.json . \
             --source-id bdf1992/Canvas
-      - name: Prove deterministic field and Board derivation
+      - name: Prove deterministic field and Board composition
         run: |
           python repo_canvas.py project . \
             --source-id bdf1992/Canvas \
             --output artifacts/canvas-second.field.json >/dev/null
           cmp artifacts/canvas.field.json artifacts/canvas-second.field.json
-          python directory_board.py build artifacts/canvas-second.field.json \
-            --output artifacts/directory-board-second.canvas.json >/dev/null
-          cmp artifacts/directory-board.canvas.json artifacts/directory-board-second.canvas.json
-          rm artifacts/canvas-second.field.json artifacts/directory-board-second.canvas.json
-      - name: Publish primary self-hosted Directory Board witness
+          python board_view.py build artifacts/canvas-second.field.json \
+            --board-id repository-containment \
+            --label "Directory Board" \
+            --premise "What exists here, and how is it contained?" \
+            --relation contains \
+            --output artifacts/board-second.canvas.json >/dev/null
+          cmp artifacts/board.canvas.json artifacts/board-second.canvas.json
+          rm artifacts/canvas-second.field.json artifacts/board-second.canvas.json
+      - name: Publish primary self-hosted Board witness
         uses: actions/upload-artifact@v4
         with:
-          name: canvas-directory-board
+          name: canvas-first-board
           path: artifacts/
           if-no-files-found: error
