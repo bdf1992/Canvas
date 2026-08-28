@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -23,41 +25,41 @@ jobs:
       - name: Resolve grounding path
         run: python canvas01.py ground-path fixtures/grounded-field.canvas.json object-note --root .
 
-  repository-board:
+  canvas-self-board:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Run repository projection tests
         run: python -m unittest -v tests.test_repo_canvas
-      - name: Clone the first real source repository
-        run: git clone --depth=1 --no-tags https://github.com/bdf1992/Soveraeign.git /tmp/Soveraeign
-      - name: Project complete Soveraeign HEAD into Canvas
+      - name: Project this exact Canvas revision into Canvas
         run: |
           mkdir -p artifacts
-          python repo_canvas.py project /tmp/Soveraeign \
-            --source-id bdf1992/Soveraeign \
-            --output artifacts/soveraeign.canvas.json \
-            --html artifacts/soveraeign-board.html \
+          python repo_canvas.py project . \
+            --source-id bdf1992/Canvas \
+            --output artifacts/canvas.canvas.json \
+            --html artifacts/canvas-board.html \
             | tee artifacts/summary.json
       - name: Validate portable Canvas contract
-        run: python canvas01.py validate artifacts/soveraeign.canvas.json
-      - name: Resolve every projected Git object
+        run: python canvas01.py validate artifacts/canvas.canvas.json
+      - name: Resolve every projected Canvas Git object
         run: |
-          python repo_canvas.py verify artifacts/soveraeign.canvas.json /tmp/Soveraeign \
-            --source-id bdf1992/Soveraeign
+          python repo_canvas.py verify artifacts/canvas.canvas.json . \
+            --source-id bdf1992/Canvas
       - name: Prove deterministic same-revision projection
         run: |
-          python repo_canvas.py project /tmp/Soveraeign \
-            --source-id bdf1992/Soveraeign \
-            --output artifacts/soveraeign-second.canvas.json >/dev/null
-          cmp artifacts/soveraeign.canvas.json artifacts/soveraeign-second.canvas.json
-          rm artifacts/soveraeign-second.canvas.json
-      - name: Publish shared board witness
+          python repo_canvas.py project . \
+            --source-id bdf1992/Canvas \
+            --output artifacts/canvas-second.canvas.json >/dev/null
+          cmp artifacts/canvas.canvas.json artifacts/canvas-second.canvas.json
+          rm artifacts/canvas-second.canvas.json
+      - name: Publish primary self-hosted board witness
         uses: actions/upload-artifact@v4
         with:
-          name: soveraeign-canvas-board
+          name: canvas-self-board
           path: artifacts/
           if-no-files-found: error
