@@ -4,63 +4,84 @@ Canvas is a portable spatial composition capability for arranging addressable th
 
 Canvas is designed to stand on its own. Integrations such as Soveraeign may provide stronger grounding, execution, custody, provenance, authority, and evidence, but they are providers of those semantics rather than prerequisites for Canvas itself.
 
+## Canvas, Board, and Card
+
+These are different layers.
+
+- **Canvas** is the spatial field: the open space in which addressed things can appear, relate, and be inspected.
+- **Board** is a premise-bearing authored view over that field. A roadmap board, release-readiness board, architecture board, or discussion board exists because someone chose a question/premise and arranged things to answer it.
+- **Card** is the bounded visual rendering of one addressed thing on the Canvas. A Card is presentation, not a new semantic object family.
+
+The raw repository projection is therefore a **repository Canvas field**, not a Board. Its Git trees/blobs may later be composed into many different Boards with different premises.
+
+The 0.1 schema still uses the historical `boards` placement field. That storage name is retained for compatibility while the premise-bearing Board distinction is made explicit in the contract; it does not make every raw placement surface a semantic Board.
+
 ## General extension model
 
-Canvas should generalize by projecting already-addressed things into a small shared grammar, not by inventing a new card type for every source system.
+Canvas generalizes by projecting already-addressed things into a small shared grammar, not by inventing a new card type for every source system.
 
 ```text
-Provider  -> resolves addressed things
+Provider  -> resolves addressed things and bytes
 Projector -> maps source objects/relations into Canvas
-Renderer  -> shows the same Canvas document
+Renderer  -> turns resolved things into visible Cards
 ```
 
-A Projector is not a new durable Canvas object. It is a deterministic adapter that emits existing Canvas primitives: `Board`, `Object`, `Frame`, `Connection`, and `GroundRef`.
-
-Task 1 proves this with Git. Git trees and blobs remain Git trees and blobs; Canvas projects each one as an ordinary grounded `reference` object and projects only real tree membership as explicit `contains` connections.
+A Projector is not a new durable Canvas object. A text renderer, HTML renderer, image renderer, etc. are likewise presentation strategies, not `TextCard`, `HtmlCard`, or other semantic object classes.
 
 ## 0.1 — Grounded Field
 
-The first contract is deliberately small. A standalone implementation can:
+The standalone implementation can:
 
 - create and reopen a Canvas;
-- place addressable objects/cards;
+- place addressable objects;
 - move and resize objects;
 - group objects with semantically neutral frames;
 - connect objects visibly;
 - attach provider-neutral `GroundRef`s;
 - persist and reload the composition;
-- explain stored grounding paths without hidden inference.
+- explain stored grounding paths without hidden inference;
+- resolve exact provider bytes for rendering;
+- render UTF-8 text/code as readable card content;
+- render HTML visually inside a sandboxed, network-disabled card surface.
 
-The core 0.1 vocabulary is:
+The durable 0.1 vocabulary remains `Canvas`, `Board` (historical placement surface), `Object`, `Frame`, `Connection`, and `GroundRef`. Card rendering does not widen it.
 
-`Canvas`, `Board`, `Object`, `Frame`, `Connection`, and `GroundRef`.
+## Task 1 — Repository as Canvas field
 
-A `GroundRef` identifies something through a provider without making provider-specific concepts part of the portable Canvas contract.
-
-```text
-GroundRef {
-  provider
-  id
-  version?
-  digest?
-}
-```
-
-## Task 1 — Repository as Canvas
-
-`repo_canvas.py` projects an exact local Git revision into one Canvas Board without widening the 0.1 schema.
+`repo_canvas.py` projects an exact local Git revision into the Canvas field without widening the 0.1 semantic object grammar.
 
 ```bash
 python repo_canvas.py project /path/to/repo \
   --source-id owner/repo \
   --output repo.canvas.json \
-  --html repo-board.html
+  --html repo.canvas.html
 
 python repo_canvas.py verify repo.canvas.json /path/to/repo \
   --source-id owner/repo
 ```
 
-The first CI witness clones the complete `bdf1992/Soveraeign` repository, pins its exact HEAD commit, emits the Canvas JSON and a directly inspectable HTML board, resolves every projected Git object, and proves a second projection of the same revision is byte-identical.
+Git trees/blobs remain Git trees/blobs. Canvas projects each as an ordinary grounded `reference` Object and only real tree membership as `contains` Connections. The renderer then resolves exact pinned blob bytes and chooses a visual strategy.
+
+The primary CI witness is **Canvas rendering Canvas itself**. The artifact is `canvas-self-field` and contains the exact Canvas JSON plus `canvas.html`.
+
+## Card rendering
+
+A Card should not be an opaque address label. It should visibly represent the thing it renders while preserving exact grounding.
+
+```text
+GroundRef
+   -> provider resolves exact bytes
+   -> renderer chooses a visual body
+   -> bounded Card appears on Canvas
+```
+
+Current baseline renderers:
+
+- UTF-8 text/code -> escaped readable text preview;
+- HTML/HTM -> sandboxed visual document preview with scripts, forms, frames, objects, and network access disabled;
+- unknown binary -> explicit binary fallback.
+
+Rendered bytes are presentation. They do not become new durable Canvas state and do not create authority.
 
 ## Architectural boundary
 
@@ -76,4 +97,4 @@ Canvas core
        └─ optional Soveraeign
 ```
 
-See [SPEC.md](SPEC.md) for the 0.1 contract and [ROADMAP.md](ROADMAP.md) for the progression to 1.0.
+See [SPEC.md](SPEC.md) for the contract and [ROADMAP.md](ROADMAP.md) for the progression to 1.0.
