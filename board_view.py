@@ -98,7 +98,6 @@ def _hierarchy_layout(
         place(root, 0)
         cursor += 120.0
 
-    # A valid hierarchical Board should place every object represented by the relation graph.
     for oid in objects:
         if oid not in positions:
             place(oid, 0)
@@ -300,7 +299,7 @@ def render_board(
 (()=>{{
 const data=JSON.parse(document.getElementById('board-data').textContent),viewport=document.getElementById('viewport'),world=document.getElementById('world'),search=document.getElementById('search'),status=document.getElementById('status');let scale=.72,panX=70,panY=70,drag=null,selected=null;const minScale=.18,maxScale=3,cards=new Map([...document.querySelectorAll('.card')].map(el=>[el.dataset.objectId,el]));
 function apply(){{world.style.transform=`translate(${{panX}}px,${{panY}}px) scale(${{scale}})`;status.textContent=`${{Math.round(scale*100)}}%${{selected?' · '+(data.objects[selected]?.path||data.objects[selected]?.label||selected):''}}`}}
-function home(){{const r=data.frame,margin=54,usableW=viewport.clientWidth-margin*2,usableH=viewport.clientHeight-margin*2,fit=Math.min(usableW/r.width,usableH/r.height,.82);scale=Math.max(.34,fit);panX=(viewport.clientWidth-r.width*scale)/2-r.x*scale;panY=(viewport.clientHeight-r.height*scale)/2-r.y*scale;apply()}}
+function home(){{const r=data.frame,margin=54,widthFit=(viewport.clientWidth-margin*2)/r.width;scale=Math.max(.55,Math.min(.72,widthFit));panX=margin-r.x*scale;panY=margin-r.y*scale;apply()}}
 function select(id){{selected=id;for(const [oid,el] of cards)el.classList.toggle('selected',oid===id);for(const edge of document.querySelectorAll('.connection'))edge.classList.toggle('active',edge.dataset.from===id||edge.dataset.to===id);apply()}}
 function focusCard(id){{const o=data.objects[id];if(!o)return;selected=id;scale=Math.max(scale,.82);panX=viewport.clientWidth/2-(o.bounds.x+o.bounds.width/2)*scale;panY=viewport.clientHeight/2-(o.bounds.y+o.bounds.height/2)*scale;select(id)}}
 for(const [id,el] of cards){{el.addEventListener('click',e=>{{e.stopPropagation();select(id)}});el.addEventListener('dblclick',e=>{{e.stopPropagation();focusCard(id)}});el.addEventListener('keydown',e=>{{if(e.key==='Enter'){{e.preventDefault();focusCard(id)}}}})}}
