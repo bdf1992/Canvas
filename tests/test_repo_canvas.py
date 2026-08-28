@@ -45,6 +45,12 @@ class RepoCanvasTests(unittest.TestCase):
     def project(self):
         return repo_canvas.project_git_repository(self.repo, source_id="example/repo")
 
+    def render(self):
+        document, _ = self.project()
+        output = Path(self.tmp.name) / "board.html"
+        repo_canvas.render_html(document, output)
+        return document, output.read_text(encoding="utf-8")
+
     def test_complete_git_tree_uses_existing_canvas_grammar(self):
         document, summary = self.project()
         self.assertEqual(3, summary["trees"])
@@ -103,16 +109,33 @@ class RepoCanvasTests(unittest.TestCase):
         self.assertIn("Filter repository paths", rendered)
         self.assertIn("Collapse subtree", rendered)
         self.assertIn("Expand all", rendered)
-        self.assertIn("Fit width", rendered)
+        self.assertIn("Fit all", rendered)
         self.assertIn("Reset view", rendered)
         self.assertIn("Pinned revision", rendered)
 
-    def test_renderer_contains_only_projection_ui_state_not_new_canvas_objects(self):
-        document, _ = self.project()
-        output = Path(self.tmp.name) / "board.html"
-        repo_canvas.render_html(document, output)
-        rendered = output.read_text(encoding="utf-8")
+    def test_canvas_wheel_zooms_instead_of_scrolling_the_board(self):
+        _, rendered = self.render()
+        self.assertIn("Repository infinite Canvas board", rendered)
+        self.assertIn("touch-action:none", rendered)
+        self.assertIn("overflow:hidden", rendered)
+        self.assertIn("addEventListener('wheel'", rendered)
+        self.assertIn("event.preventDefault()", rendered)
+        self.assertIn("zoomAt(scale * factor, event.clientX, event.clientY)", rendered)
+        self.assertNotIn("scrollLeft", rendered)
+        self.assertNotIn("scrollTop", rendered)
+        self.assertNotIn("scale-shell", rendered)
 
+    def test_infinite_canvas_pan_is_world_translation_not_scroll_position(self):
+        _, rendered = self.render()
+        self.assertIn("let panX = 0", rendered)
+        self.assertIn("let panY = 0", rendered)
+        self.assertIn("translate(${panX}px, ${panY}px) scale(${scale})", rendered)
+        self.assertIn("viewport.style.backgroundPosition = `${panX}px ${panY}px`", rendered)
+        self.assertIn("panX = drag.panX + (event.clientX - drag.x)", rendered)
+        self.assertIn("panY = drag.panY + (event.clientY - drag.y)", rendered)
+
+    def test_renderer_contains_only_projection_ui_state_not_new_canvas_objects(self):
+        document, rendered = self.render()
         self.assertNotIn("RepoNode", rendered)
         self.assertNotIn("FileCard", rendered)
         self.assertNotIn("DirectoryCard", rendered)
