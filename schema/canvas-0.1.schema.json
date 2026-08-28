@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bdf1992/Canvas/schema/canvas-0.1.schema.json",
+  "title": "Canvas 0.1 — Grounded Field",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "canvas_id", "boards", "objects", "frames", "connections"],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "canvas_id": {"$ref": "#/$defs/id"},
+    "boards": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/board"}
+    },
+    "objects": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/object"}
+    },
+    "frames": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/frame"}
+    },
+    "connections": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/connection"}
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": {"type": "number"},
+        "y": {"type": "number"},
+        "width": {"type": "number", "exclusiveMinimum": 0},
+        "height": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "groundRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "id"],
+      "properties": {
+        "provider": {"type": "string", "minLength": 1},
+        "id": {"type": "string", "minLength": 1},
+        "version": {"type": ["string", "null"]},
+        "digest": {"type": ["string", "null"]}
+      }
+    },
+    "placement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["board_id", "bounds"],
+      "properties": {
+        "board_id": {"$ref": "#/$defs/id"},
+        "bounds": {"$ref": "#/$defs/bounds"}
+      }
+    },
+    "board": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["board_id", "label"],
+      "properties": {
+        "board_id": {"$ref": "#/$defs/id"},
+        "label": {"type": "string"}
+      }
+    },
+    "object": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object_id", "kind", "placement"],
+      "properties": {
+        "object_id": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["reference", "note", "annotation", "mock", "derived"]},
+        "label": {"type": "string"},
+        "content": {"type": "string"},
+        "placement": {"$ref": "#/$defs/placement"},
+        "ground_refs": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/groundRef"},
+          "uniqueItems": true
+        }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frame_id", "board_id", "label", "bounds", "members"],
+      "properties": {
+        "frame_id": {"$ref": "#/$defs/id"},
+        "board_id": {"$ref": "#/$defs/id"},
+        "label": {"type": "string"},
+        "bounds": {"$ref": "#/$defs/bounds"},
+        "members": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/id"},
+          "uniqueItems": true
+        }
+      }
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object_id"],
+      "properties": {
+        "object_id": {"$ref": "#/$defs/id"}
+      }
+    },
+    "connection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["connection_id", "from", "to", "kind"],
+      "properties": {
+        "connection_id": {"$ref": "#/$defs/id"},
+        "from": {"$ref": "#/$defs/endpoint"},
+        "to": {"$ref": "#/$defs/endpoint"},
+        "kind": {"type": "string", "minLength": 1},
+        "direction": {"enum": ["directed", "undirected"]}
+      }
+    }
+  }
+}
