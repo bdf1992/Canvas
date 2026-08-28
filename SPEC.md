@@ -1,6 +1,6 @@
 # Canvas 0.1 Contract — Grounded Field
 
-Status: execution staging
+Status: executable baseline
 
 ## Definition
 
@@ -74,6 +74,29 @@ A provider-neutral reference to addressed external ground.
 
 Providers own the semantics of resolution, version, digest, authority, custody, provenance, and availability.
 
+## Generalization by projection
+
+Canvas generalizes through adapters, not through a growing family of source-specific Canvas object kinds.
+
+```text
+Provider  -> resolves addressed source objects
+Projector -> deterministically maps source objects/relations into Canvas primitives
+Renderer  -> presents the resulting Canvas document
+```
+
+A Projector is implementation behavior, not a new durable schema object.
+
+A valid projector:
+
+1. emits only the portable Canvas grammar unless a later contract explicitly widens it;
+2. grounds projected Objects in exact provider references;
+3. emits a Connection only when the source can support that relation or the user explicitly creates it;
+4. keeps layout and grouping semantically neutral;
+5. pins enough source revision information for the projection to be reproduced;
+6. does not write back to the source merely because presentation changes.
+
+Task 1 uses Git as the first generalization witness. A Git tree/blob is projected as an ordinary `reference` Object with a `git-object` GroundRef. Git tree membership is projected as `contains`. No `RepoNode`, `FileCard`, `DirectoryCard`, or other parallel repository ontology is introduced.
+
 ## Invariants
 
 1. **Standalone coherence** — Canvas core MUST function without Soveraeign or any other specific provider.
@@ -86,6 +109,8 @@ Providers own the semantics of resolution, version, digest, authority, custody, 
 8. **Visible relation** — durable semantic connection MUST exist as explicit Connection data rather than being inferred from geometry.
 9. **Provider isolation** — provider-specific concepts MUST NOT become required fields in the portable core schema.
 10. **Human/agent grammar parity** — an agent-created durable object or connection MUST be inspectable through the same data grammar as a human-created one.
+11. **Projection fidelity** — a projector MUST NOT manufacture source relations merely to make a board more convenient or attractive.
+12. **Revision closure** — when a source supports exact revisions, a durable source projection MUST identify the exact revision used.
 
 ## Grounding
 
@@ -126,9 +151,11 @@ resolve(GroundRef) -> Resolution
 
 A Resolution MAY include display bytes/content metadata, existence, version, digest, provenance, or other provider-defined facts. Canvas core MUST NOT treat optional provider facts as authority unless the provider explicitly declares their semantics.
 
-A local/file provider is sufficient for standalone 0.1 acceptance.
+A local/file provider is sufficient for standalone 0.1 acceptance. Git is the first provider/projector witness used to prove the same grammar can project a complete external topology without schema widening.
 
-## 0.1 acceptance witness
+## 0.1 acceptance witnesses
+
+### Grounded Field
 
 A conforming standalone implementation can, with no Soveraeign installation:
 
@@ -143,6 +170,20 @@ A conforming standalone implementation can, with no Soveraeign installation:
 9. show that the note's grounding path reaches the file-backed GroundRef;
 10. demonstrate that changing layout or frame membership does not mutate the referenced resource.
 
+### Task 1 — complete repository projection
+
+A conforming Git projector can:
+
+1. pin an exact repository commit;
+2. enumerate the complete tracked Git tree at that revision;
+3. emit one grounded `reference` Object for each real Git tree/blob object represented on the board;
+4. emit only real parent/child `contains` relations from the Git tree;
+5. validate the generated document against the unchanged Canvas 0.1 schema;
+6. resolve every projected GroundRef to the exact Git object digest;
+7. render the complete result as one inspectable Board;
+8. reproduce the same semantic document from the same revision;
+9. ignore dirty/untracked working-tree state when projecting a pinned commit.
+
 ## Explicit non-goals for 0.1
 
 - generalized whiteboard drawing;
@@ -153,6 +194,7 @@ A conforming standalone implementation can, with no Soveraeign installation:
 - graph database requirements;
 - universal scoring;
 - provider-specific authority logic;
-- Soveraeign dependency.
+- Soveraeign dependency;
+- issue/PR/workflow overlays on the repository board before the repository projection itself is accepted.
 
 Those may arrive through later contracts where justified by executable evidence.
