@@ -1,0 +1,58 @@
+{
+  "schema_version": "0.1",
+  "canvas_id": "canvas-grounded-field-001",
+  "boards": [
+    {
+      "board_id": "board-main",
+      "label": "Grounded Field"
+    }
+  ],
+  "objects": [
+    {
+      "object_id": "object-source",
+      "kind": "reference",
+      "label": "example.txt",
+      "placement": {
+        "board_id": "board-main",
+        "bounds": {"x": 80, "y": 100, "width": 240, "height": 140}
+      },
+      "ground_refs": [
+        {
+          "provider": "local-file",
+          "id": "fixtures/example.txt",
+          "version": null,
+          "digest": null
+        }
+      ]
+    },
+    {
+      "object_id": "object-note",
+      "kind": "note",
+      "label": "Observation",
+      "content": "This note is grounded by an explicit connection to the file-backed object.",
+      "placement": {
+        "board_id": "board-main",
+        "bounds": {"x": 420, "y": 120, "width": 300, "height": 160}
+      },
+      "ground_refs": []
+    }
+  ],
+  "frames": [
+    {
+      "frame_id": "frame-working-set",
+      "board_id": "board-main",
+      "label": "Working set",
+      "bounds": {"x": 40, "y": 50, "width": 740, "height": 300},
+      "members": ["object-source", "object-note"]
+    }
+  ],
+  "connections": [
+    {
+      "connection_id": "connection-note-source",
+      "from": {"object_id": "object-note"},
+      "to": {"object_id": "object-source"},
+      "kind": "grounded-by",
+      "direction": "directed"
+    }
+  ]
+}
