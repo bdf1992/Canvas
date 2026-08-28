@@ -221,9 +221,8 @@ def resolve_git_ground_ref(
 
 
 def render_html(document: dict[str, Any], output: str | Path) -> None:
-    # This renderer may maintain local interaction state, but it does not write
-    # that state back into the Canvas document. Selection, collapse, filter,
-    # zoom, and pan remain presentation-only.
+    # View state is intentionally local to the renderer. Pan, zoom, selection,
+    # collapse and filtering never write back to the Canvas document.
     objects = {obj["object_id"]: obj for obj in document["objects"]}
     children: dict[str, list[str]] = {object_id: [] for object_id in objects}
     parents: dict[str, str] = {}
@@ -317,8 +316,9 @@ def render_html(document: dict[str, Any], output: str | Path) -> None:
 <style>
 :root {{ color-scheme: dark; font-family: ui-sans-serif, system-ui, sans-serif; }}
 * {{ box-sizing:border-box; }}
+html, body {{ width:100%; height:100%; overflow:hidden; }}
 body {{ margin:0; background:#111318; color:#e8ebf0; }}
-header {{ position:sticky; top:0; z-index:10; display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:10px 12px; background:#181b22; border-bottom:1px solid #333945; }}
+header {{ position:relative; z-index:10; display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:10px 12px; background:#181b22; border-bottom:1px solid #333945; }}
 header strong {{ white-space:nowrap; }}
 header .count {{ color:#a8b0bd; white-space:nowrap; font-size:12px; }}
 .toolbar {{ display:flex; flex:1; min-width:280px; gap:6px; align-items:center; }}
@@ -326,12 +326,11 @@ input {{ min-width:180px; flex:1; padding:8px 10px; border:1px solid #444b59; bo
 button {{ color:inherit; font:inherit; }}
 .control {{ min-height:38px; padding:7px 10px; border:1px solid #444b59; border-radius:8px; background:#20242d; cursor:pointer; }}
 .control:disabled {{ opacity:.45; cursor:not-allowed; }}
-.workspace {{ display:grid; grid-template-columns:minmax(0,1fr) 320px; min-height:620px; }}
-.viewport {{ position:relative; overflow:auto; height:calc(100vh - 62px); min-height:560px; cursor:grab; touch-action:pan-x pan-y; }}
+.workspace {{ display:grid; grid-template-columns:minmax(0,1fr) 320px; height:calc(100vh - 59px); min-height:0; }}
+.viewport {{ position:relative; overflow:hidden; min-width:0; min-height:0; cursor:grab; touch-action:none; background-color:#111318; background-image:radial-gradient(#2d3340 1px, transparent 1px); background-size:24px 24px; }}
 .viewport.dragging {{ cursor:grabbing; user-select:none; }}
-.scale-shell {{ position:relative; }}
-.board {{ position:absolute; left:0; top:0; width:{max_x}px; height:{max_y}px; transform-origin:0 0; background-image:radial-gradient(#2d3340 1px, transparent 1px); background-size:24px 24px; }}
-svg {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }}
+.world {{ position:absolute; left:0; top:0; width:{max_x}px; height:{max_y}px; transform-origin:0 0; will-change:transform; }}
+svg {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }}
 .edge {{ fill:none; stroke:#505968; stroke-width:1.5; }}
 .edge.hidden {{ display:none; }}
 .card {{ position:absolute; display:block; box-sizing:border-box; padding:9px 11px; border:1px solid #3b4350; border-radius:9px; background:#1d212a; text-align:left; overflow:hidden; cursor:pointer; }}
@@ -341,7 +340,7 @@ svg {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none;
 .card span {{ display:block; margin-top:7px; color:#a8b0bd; font-size:10px; }}
 .card.hidden {{ display:none; }}
 .card.selected {{ outline:3px solid #c3cad5; outline-offset:2px; }}
-.inspector {{ height:calc(100vh - 62px); min-height:560px; overflow:auto; border-left:1px solid #333945; background:#15181f; padding:16px; }}
+.inspector {{ min-height:0; overflow:auto; border-left:1px solid #333945; background:#15181f; padding:16px; }}
 .inspector h2 {{ margin:0 0 12px; font-size:16px; }}
 .inspector dl {{ margin:0; }}
 .inspector dt {{ margin-top:12px; color:#8f98a6; font-size:11px; text-transform:uppercase; letter-spacing:.05em; }}
@@ -350,11 +349,10 @@ svg {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none;
 .context button {{ width:100%; margin-top:6px; text-align:left; }}
 .context-list {{ max-height:240px; overflow:auto; }}
 .muted {{ color:#8f98a6; }}
-#status {{ min-width:90px; text-align:right; color:#a8b0bd; font-size:12px; }}
+#status {{ min-width:120px; text-align:right; color:#a8b0bd; font-size:12px; }}
 @media (max-width: 820px) {{
-  .workspace {{ grid-template-columns:1fr; }}
-  .viewport {{ height:560px; }}
-  .inspector {{ height:auto; min-height:0; border-left:0; border-top:1px solid #333945; }}
+  .workspace {{ grid-template-columns:1fr; grid-template-rows:minmax(0,1fr) auto; }}
+  .inspector {{ max-height:36vh; border-left:0; border-top:1px solid #333945; }}
 }}
 </style>
 <header>
@@ -364,18 +362,16 @@ svg {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none;
     <input id="filter" aria-label="Filter repository paths" placeholder="Filter paths">
     <button type="button" class="control" id="zoom-out" aria-label="Zoom out">−</button>
     <button type="button" class="control" id="zoom-in" aria-label="Zoom in">+</button>
-    <button type="button" class="control" id="fit">Fit width</button>
+    <button type="button" class="control" id="fit">Fit all</button>
     <button type="button" class="control" id="reset">Reset view</button>
     <span id="status" aria-live="polite"></span>
   </div>
 </header>
 <div class="workspace">
-  <div class="viewport" id="viewport" tabindex="0" aria-label="Repository Canvas board">
-    <div class="scale-shell" id="scale-shell" style="width:{max_x}px;height:{max_y}px">
-      <div class="board" id="board">
-        <svg viewBox="0 0 {max_x} {max_y}" preserveAspectRatio="none">{''.join(lines)}</svg>
-        {''.join(cards)}
-      </div>
+  <div class="viewport" id="viewport" tabindex="0" aria-label="Repository infinite Canvas board">
+    <div class="world" id="world">
+      <svg viewBox="0 0 {max_x} {max_y}" preserveAspectRatio="none">{''.join(lines)}</svg>
+      {''.join(cards)}
     </div>
   </div>
   <aside class="inspector" aria-live="polite">
@@ -409,8 +405,7 @@ svg {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none;
 (() => {{
   const graph = JSON.parse(document.getElementById('graph-data').textContent);
   const viewport = document.getElementById('viewport');
-  const board = document.getElementById('board');
-  const shell = document.getElementById('scale-shell');
+  const world = document.getElementById('world');
   const filter = document.getElementById('filter');
   const status = document.getElementById('status');
   const cards = [...document.querySelectorAll('.card')];
@@ -418,10 +413,14 @@ svg {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none;
   const cardsById = new Map(cards.map(card => [card.dataset.objectId, card]));
   const allIds = new Set(cardsById.keys());
   const collapsed = new Set();
-  let selected = null;
-  let scale = 1;
   const baseWidth = {max_x};
   const baseHeight = {max_y};
+  const minScale = 0.08;
+  const maxScale = 4;
+  let selected = null;
+  let scale = 1;
+  let panX = 0;
+  let panY = 0;
 
   const detail = document.getElementById('detail');
   const detailEmpty = document.getElementById('detail-empty');
@@ -472,6 +471,18 @@ svg {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none;
     return new Set([...allIds].filter(id => !hidden.has(id)));
   }}
 
+  function updateStatus() {{
+    status.textContent = `${{visibleIds().size}} shown · ${{Math.round(scale * 100)}}%`;
+  }}
+
+  function applyView() {{
+    world.style.transform = `translate(${{panX}}px, ${{panY}}px) scale(${{scale}})`;
+    const grid = 24 * scale;
+    viewport.style.backgroundSize = `${{grid}}px ${{grid}}px`;
+    viewport.style.backgroundPosition = `${{panX}}px ${{panY}}px`;
+    updateStatus();
+  }}
+
   function updateVisibility() {{
     const visible = visibleIds();
     for (const card of cards) {{
@@ -482,7 +493,7 @@ svg {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none;
     for (const edge of edges) {{
       edge.classList.toggle('hidden', !visible.has(edge.dataset.from) || !visible.has(edge.dataset.to));
     }}
-    status.textContent = `${{visible.size}} shown`;
+    updateStatus();
   }}
 
   function navButton(id) {{
@@ -517,28 +528,58 @@ svg {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none;
     else parentLink.textContent = 'Repository root';
 
     childrenLinks.replaceChildren();
-    const children = graph.children[selected] || [];
-    if (children.length) {{
-      for (const child of children) childrenLinks.appendChild(navButton(child));
+    const childIds = graph.children[selected] || [];
+    if (childIds.length) {{
+      for (const child of childIds) childrenLinks.appendChild(navButton(child));
     }} else {{
       childrenLinks.textContent = 'No children';
     }}
 
-    toggleSubtree.disabled = children.length === 0;
+    toggleSubtree.disabled = childIds.length === 0;
     toggleSubtree.textContent = collapsed.has(selected) ? 'Expand subtree' : 'Collapse subtree';
+  }}
+
+  function clampScale(value) {{
+    return Math.max(minScale, Math.min(maxScale, value));
+  }}
+
+  function zoomAt(nextScale, clientX, clientY) {{
+    const bounded = clampScale(nextScale);
+    const rect = viewport.getBoundingClientRect();
+    const sx = clientX - rect.left;
+    const sy = clientY - rect.top;
+    const worldX = (sx - panX) / scale;
+    const worldY = (sy - panY) / scale;
+    scale = bounded;
+    panX = sx - worldX * scale;
+    panY = sy - worldY * scale;
+    applyView();
+  }}
+
+  function zoomFromCenter(factor) {{
+    const rect = viewport.getBoundingClientRect();
+    zoomAt(scale * factor, rect.left + rect.width / 2, rect.top + rect.height / 2);
+  }}
+
+  function fitAll() {{
+    const margin = 64;
+    const availableWidth = Math.max(1, viewport.clientWidth - margin * 2);
+    const availableHeight = Math.max(1, viewport.clientHeight - margin * 2);
+    scale = clampScale(Math.min(1, availableWidth / baseWidth, availableHeight / baseHeight));
+    panX = (viewport.clientWidth - baseWidth * scale) / 2;
+    panY = (viewport.clientHeight - baseHeight * scale) / 2;
+    applyView();
   }}
 
   function centerSelected() {{
     if (!selected) return;
     const card = cardsById.get(selected);
     if (!card) return;
-    const x = (card.offsetLeft + card.offsetWidth / 2) * scale;
-    const y = (card.offsetTop + card.offsetHeight / 2) * scale;
-    viewport.scrollTo({{
-      left: Math.max(0, x - viewport.clientWidth / 2),
-      top: Math.max(0, y - viewport.clientHeight / 2),
-      behavior: 'smooth'
-    }});
+    const centerX = card.offsetLeft + card.offsetWidth / 2;
+    const centerY = card.offsetTop + card.offsetHeight / 2;
+    panX = viewport.clientWidth / 2 - centerX * scale;
+    panY = viewport.clientHeight / 2 - centerY * scale;
+    applyView();
   }}
 
   function selectObject(id, center = false) {{
@@ -548,27 +589,18 @@ svg {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none;
     if (center) centerSelected();
   }}
 
-  function setScale(next) {{
-    scale = Math.max(0.2, Math.min(2.5, next));
-    board.style.transform = `scale(${{scale}})`;
-    shell.style.width = `${{baseWidth * scale}}px`;
-    shell.style.height = `${{baseHeight * scale}}px`;
-    status.textContent = `${{visibleIds().size}} shown · ${{Math.round(scale * 100)}}%`;
-  }}
-
   for (const card of cards) card.addEventListener('click', () => selectObject(card.dataset.objectId));
   filter.addEventListener('input', updateVisibility);
-  document.getElementById('zoom-out').addEventListener('click', () => setScale(scale / 1.2));
-  document.getElementById('zoom-in').addEventListener('click', () => setScale(scale * 1.2));
-  document.getElementById('fit').addEventListener('click', () => setScale(Math.min(1, (viewport.clientWidth - 24) / baseWidth)));
+  document.getElementById('zoom-out').addEventListener('click', () => zoomFromCenter(1 / 1.2));
+  document.getElementById('zoom-in').addEventListener('click', () => zoomFromCenter(1.2));
+  document.getElementById('fit').addEventListener('click', fitAll);
   document.getElementById('reset').addEventListener('click', () => {{
     filter.value = '';
     collapsed.clear();
     selected = null;
-    setScale(1);
-    viewport.scrollTo({{left:0, top:0}});
     updateVisibility();
     renderInspector();
+    fitAll();
   }});
   document.getElementById('center-selected').addEventListener('click', centerSelected);
   toggleSubtree.addEventListener('click', () => {{
@@ -584,17 +616,26 @@ svg {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none;
     renderInspector();
   }});
 
+  // The canvas wheel is depth, not document movement: every wheel/trackpad
+  // gesture zooms around the pointer. Panning is an explicit drag gesture.
+  viewport.addEventListener('wheel', event => {{
+    event.preventDefault();
+    const factor = Math.exp(-event.deltaY * 0.0015);
+    zoomAt(scale * factor, event.clientX, event.clientY);
+  }}, {{passive:false}});
+
   let drag = null;
   viewport.addEventListener('pointerdown', event => {{
     if (event.target.closest('.card,button,input')) return;
-    drag = {{x:event.clientX, y:event.clientY, left:viewport.scrollLeft, top:viewport.scrollTop}};
+    drag = {{x:event.clientX, y:event.clientY, panX, panY}};
     viewport.classList.add('dragging');
     viewport.setPointerCapture(event.pointerId);
   }});
   viewport.addEventListener('pointermove', event => {{
     if (!drag) return;
-    viewport.scrollLeft = drag.left - (event.clientX - drag.x);
-    viewport.scrollTop = drag.top - (event.clientY - drag.y);
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyView();
   }});
   function endDrag(event) {{
     if (!drag) return;
@@ -605,8 +646,13 @@ svg {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none;
   viewport.addEventListener('pointerup', endDrag);
   viewport.addEventListener('pointercancel', endDrag);
 
+  window.addEventListener('resize', () => {{
+    if (!selected) fitAll();
+  }});
+
   updateVisibility();
   renderInspector();
+  requestAnimationFrame(fitAll);
 }})();
 </script>
 '''
