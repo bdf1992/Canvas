@@ -4,7 +4,7 @@ The roadmap is capability progression, not a promise to accumulate UI features. 
 
 | Version | Theme | Contract growth | Exit condition |
 |---|---|---|---|
-| 0.1 | Grounded Field | Canvas, Board, Object, Frame, Connection, GroundRef, persistence | Standalone local witness passes without Soveraeign |
+| 0.1 | Grounded Field | Canvas, Board, Object, Frame, Connection, GroundRef, persistence, provider/projector/renderer extension pattern | standalone grounding passes and one complete external topology (Git repository) projects without schema widening |
 | 0.2 | Relational Canvas | typed relations, measures, grounding paths/hops, richer views | relations remain explicit and inspectable; no geometry-as-semantics |
 | 0.3 | Circuit Grammar | Circuit, Module/Site, Port, Input/Output, constrained directional flow, deterministic Netlist IR | one circuit compiles deterministically from visible canonical connectivity |
 | 0.4 | Traversal | Runner contract, pulses/tokens, local executable sites, traversal traces | one local circuit executes and returns an inspectable trace |
@@ -15,13 +15,34 @@ The roadmap is capability progression, not a promise to accumulate UI features. 
 | 0.9 | Interop & Conformance | provider SDK, runner SDK, renderer contract, migration/version rules, conformance suite | independent implementation can pass portable conformance fixtures |
 | 1.0 | Stable Contract | portable schema, reference renderer, circuit compiler, provider/runtime interfaces | stable compatibility contract with migration and conformance guarantees |
 
+## 0.1 execution order
+
+0.1 now has two proof layers:
+
+1. **Grounded Field** — local-file reference + grounded annotation proved the minimal grammar.
+2. **Task 1: repository projection** — project the complete `bdf1992/Soveraeign` Git tree into that unchanged grammar and render it as one board in the shared GitHub environment.
+
+Do not advance the optional Soveraeign semantic adapter ahead of Task 1. First prove Canvas is useful by representing the repository we already share without importing Soveraeign domain semantics.
+
+## Generalization rule
+
+New source systems should normally add a Provider and/or Projector, not a new Canvas object family.
+
+```text
+Provider  -> addressed source resolution
+Projector -> existing Canvas primitives
+Renderer  -> inspectable presentation
+```
+
+Schema growth is justified only when a real source or behavior cannot be represented without loss or contradiction using the existing grammar.
+
 ## Dependency rule
 
 Every version MUST remain valid with provider-neutral contracts. Soveraeign may act as the strongest reference integration but MUST NOT become a prerequisite for Canvas core.
 
 ## Soveraeign integration trajectory
 
-Soveraeign should progressively demonstrate the strongest optional implementation of the generic contracts:
+After the repository projection is accepted, Soveraeign can progressively demonstrate stronger optional implementations of the generic contracts:
 
 - `GroundRef` -> exact Asset / AssetVersion resolution;
 - provider facts -> provenance and custody projections;
