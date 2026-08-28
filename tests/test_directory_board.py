@@ -110,8 +110,8 @@ class DirectoryBoardTests(unittest.TestCase):
         rendered = output.read_text(encoding="utf-8")
         contains = [c for c in board["connections"] if c["kind"] == "contains"]
         self.assertIn("graph.connections", rendered)
-        self.assertIn("data.connectionId", rendered)
-        self.assertIn("class='connection'", rendered.replace('"', "'"))
+        self.assertIn("p.dataset.connectionId=edge.id", rendered)
+        self.assertIn("p.setAttribute('class','connection'", rendered)
         self.assertEqual(len(board["objects"]) - 1, len(contains))
 
     def test_directory_interaction_is_collapse_search_zoom_and_pan(self):
