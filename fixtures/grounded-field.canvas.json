@@ -4,7 +4,8 @@
   "boards": [
     {
       "board_id": "board-main",
-      "label": "Grounded Field"
+      "label": "Grounded Field",
+      "premise": "How is this observation grounded in an addressed file?"
     }
   ],
   "objects": [
