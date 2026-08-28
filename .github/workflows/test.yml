@@ -25,7 +25,7 @@ jobs:
       - name: Resolve grounding path
         run: python canvas01.py ground-path fixtures/grounded-field.canvas.json object-note --root .
 
-  canvas-self-board:
+  canvas-self-field:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,15 +34,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Run repository projection tests
+      - name: Run repository projection and card-rendering tests
         run: python -m unittest -v tests.test_repo_canvas
-      - name: Project this exact Canvas revision into Canvas
+      - name: Project this exact Canvas revision into the Canvas field
         run: |
           mkdir -p artifacts
           python repo_canvas.py project . \
             --source-id bdf1992/Canvas \
             --output artifacts/canvas.canvas.json \
-            --html artifacts/canvas-board.html \
+            --html artifacts/canvas.html \
             | tee artifacts/summary.json
       - name: Validate portable Canvas contract
         run: python canvas01.py validate artifacts/canvas.canvas.json
@@ -57,9 +57,9 @@ jobs:
             --output artifacts/canvas-second.canvas.json >/dev/null
           cmp artifacts/canvas.canvas.json artifacts/canvas-second.canvas.json
           rm artifacts/canvas-second.canvas.json
-      - name: Publish primary self-hosted board witness
+      - name: Publish primary self-hosted Canvas field witness
         uses: actions/upload-artifact@v4
         with:
-          name: canvas-self-board
+          name: canvas-self-field
           path: artifacts/
           if-no-files-found: error
