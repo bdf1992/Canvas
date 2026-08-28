@@ -1,14 +1,14 @@
-# Task 2 — Make the self-board usable
+# Task 2 — Self-hosted view mechanics
 
-Status: active
+Status: completed / superseded by Directory Board
 
-The first repository board is the Canvas repository itself. This task improves only the **view mechanics** over that already-grounded projection.
+This task established the reusable view mechanics over the grounded Canvas repository projection: infinite zoom/pan, search/focus, transient selection, and collapse state without mutating source semantics.
 
-## Constraint
+Its original mistake was calling the raw repository projection itself a Board. That distinction is now corrected.
 
-Do not create new semantic Canvas object classes or provider state to make the board easier to use.
+## What remains true
 
-The source remains:
+The source chain is still:
 
 ```text
 Git objects + Git tree membership
@@ -18,31 +18,26 @@ Canvas reference Objects + contains Connections
 renderer-local interaction state
 ```
 
-Renderer-local state such as selection, zoom, pan, collapsed directories, filtering, and focus is presentation-only and is not persisted as domain meaning.
+Renderer-local state such as selection, zoom, pan, collapsed directories, search, and focus is presentation-only and is not persisted as provider/domain meaning.
 
-## Acceptance
+## What changed
 
-The generated `canvas-board.html` must let a human:
+The raw repository projection is now called the **repository field**.
 
-1. see the entire Canvas repository as one board;
-2. distinguish trees from blobs;
-3. search/filter by path;
-4. select a repository object and inspect its exact path, Git object type, digest, and pinned revision;
-5. see its parent/child context from existing `contains` Connections;
-6. collapse/expand directory subtrees without changing the Canvas document;
-7. zoom and pan around the board;
-8. reset to the complete repository view;
-9. navigate these controls without creating or mutating any source object;
-10. regenerate the same semantic Canvas JSON for the same commit regardless of renderer interaction.
+The first real Board is **Directory Board**, whose explicit premise is:
 
-## Refusals
+> What exists here, and how is it contained?
 
-- no `RepoNode`, `FileCard`, `DirectoryCard`, or other repository-specific Canvas schema type;
+Directory Board reuses the same grounded Objects and `contains` Connections, renders one bounded Board frame, and represents entries as directory/file rows with visible connection geometry. It does not use Cards.
+
+## Preserved refusals
+
+- no `RepoNode`, `FileCard`, `DirectoryCard`, or other repository-specific semantic Object type;
 - no write-back to Git;
 - no hidden relationship inference;
 - no issue/PR/workflow overlays yet;
-- no new Canvas objects merely to represent UI controls;
-- no SOV dependency;
+- no new source Objects merely to represent UI controls;
+- no Soveraeign dependency;
 - no Circuit semantics.
 
-The board is an interface over the existing repository, not a second repository model.
+The current acceptance surface is defined by `FIRST-BOARD.md`, `DESIGN.md`, and `directory_board.py`.
