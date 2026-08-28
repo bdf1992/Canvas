@@ -1,0 +1,3 @@
+Canvas 0.1 local grounding fixture.
+
+This file exists only to prove that a provider-neutral GroundRef can resolve to a concrete local resource without requiring Soveraeign.
