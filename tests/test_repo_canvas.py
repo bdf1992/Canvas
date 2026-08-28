@@ -1,3 +1,4 @@
+import copy
 import subprocess
 import tempfile
 import unittest
@@ -86,13 +87,37 @@ class RepoCanvasTests(unittest.TestCase):
 
     def test_renderer_shows_repository_paths_without_new_domain_objects(self):
         document, _ = self.project()
+        before = copy.deepcopy(document)
         output = Path(self.tmp.name) / "board.html"
         repo_canvas.render_html(document, output)
         rendered = output.read_text(encoding="utf-8")
+
+        self.assertEqual(before, document)
         self.assertIn("example/repo", rendered)
         self.assertIn("dir/sub/c.txt", rendered)
         self.assertIn("6 objects", rendered)
         self.assertIn("5 connections", rendered)
+        self.assertIn('data-object-id="git:dir"', rendered)
+        self.assertIn('data-from="git:dir"', rendered)
+        self.assertIn('data-to="git:dir/sub"', rendered)
+        self.assertIn("Filter repository paths", rendered)
+        self.assertIn("Collapse subtree", rendered)
+        self.assertIn("Expand all", rendered)
+        self.assertIn("Fit width", rendered)
+        self.assertIn("Reset view", rendered)
+        self.assertIn("Pinned revision", rendered)
+
+    def test_renderer_contains_only_projection_ui_state_not_new_canvas_objects(self):
+        document, _ = self.project()
+        output = Path(self.tmp.name) / "board.html"
+        repo_canvas.render_html(document, output)
+        rendered = output.read_text(encoding="utf-8")
+
+        self.assertNotIn("RepoNode", rendered)
+        self.assertNotIn("FileCard", rendered)
+        self.assertNotIn("DirectoryCard", rendered)
+        self.assertEqual({"reference"}, {obj["kind"] for obj in document["objects"]})
+        self.assertEqual({"contains"}, {connection["kind"] for connection in document["connections"]})
 
 
 if __name__ == "__main__":

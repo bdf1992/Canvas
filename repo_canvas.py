@@ -221,12 +221,23 @@ def resolve_git_ground_ref(
 
 
 def render_html(document: dict[str, Any], output: str | Path) -> None:
+    # This renderer may maintain local interaction state, but it does not write
+    # that state back into the Canvas document. Selection, collapse, filter,
+    # zoom, and pan remain presentation-only.
     objects = {obj["object_id"]: obj for obj in document["objects"]}
-    tree_ids = {
-        connection["from"]["object_id"]
-        for connection in document["connections"]
-        if connection["kind"] == "contains"
-    }
+    children: dict[str, list[str]] = {object_id: [] for object_id in objects}
+    parents: dict[str, str] = {}
+    for connection in document["connections"]:
+        if connection["kind"] != "contains":
+            continue
+        source_id = connection["from"]["object_id"]
+        target_id = connection["to"]["object_id"]
+        children.setdefault(source_id, []).append(target_id)
+        parents[target_id] = source_id
+    for values in children.values():
+        values.sort()
+
+    tree_ids = {object_id for object_id, values in children.items() if values}
     max_x = max(
         (
             obj["placement"]["bounds"]["x"] + obj["placement"]["bounds"]["width"]
@@ -246,65 +257,357 @@ def render_html(document: dict[str, Any], output: str | Path) -> None:
     for connection in document["connections"]:
         if connection["kind"] != "contains":
             continue
-        source = objects[connection["from"]["object_id"]]["placement"]["bounds"]
-        target = objects[connection["to"]["object_id"]]["placement"]["bounds"]
+        source_id = connection["from"]["object_id"]
+        target_id = connection["to"]["object_id"]
+        source = objects[source_id]["placement"]["bounds"]
+        target = objects[target_id]["placement"]["bounds"]
         x1 = source["x"] + source["width"]
         y1 = source["y"] + source["height"] / 2
         x2 = target["x"]
         y2 = target["y"] + target["height"] / 2
         lines.append(
-            f'<path d="M {x1} {y1} C {x1 + 60} {y1}, {x2 - 60} {y2}, {x2} {y2}" />'
+            f'<path class="edge" data-from="{html.escape(source_id, quote=True)}" '
+            f'data-to="{html.escape(target_id, quote=True)}" '
+            f'd="M {x1} {y1} C {x1 + 60} {y1}, {x2 - 60} {y2}, {x2} {y2}" />'
         )
 
     cards: list[str] = []
+    client_objects: dict[str, dict[str, Any]] = {}
     for object_id, obj in objects.items():
         bounds = obj["placement"]["bounds"]
         object_class = "tree" if object_id in tree_ids else "blob"
-        label = html.escape(obj.get("label", object_id))
-        search_label = html.escape(obj.get("label", object_id).lower(), quote=True)
+        label_raw = obj.get("label", object_id)
+        label = html.escape(label_raw)
         ref = obj.get("ground_refs", [{}])[0]
-        digest = html.escape(str(ref.get("digest", ""))[:12])
+        raw_ref_id = str(ref.get("id", ""))
+        path = raw_ref_id.partition("#")[2] or label_raw
+        digest_raw = str(ref.get("digest", ""))
+        version_raw = str(ref.get("version", ""))
         cards.append(
-            f'<div class="card {object_class}" '
+            f'<button type="button" class="card {object_class}" '
             f'style="left:{bounds["x"]}px;top:{bounds["y"]}px;'
             f'width:{bounds["width"]}px;height:{bounds["height"]}px" '
-            f'data-label="{search_label}">'
-            f'<strong>{label}</strong><span>{object_class} · {digest}</span></div>'
+            f'data-object-id="{html.escape(object_id, quote=True)}" '
+            f'data-path="{html.escape(path.lower(), quote=True)}" '
+            f'aria-label="Inspect {html.escape(path, quote=True)}">'
+            f'<strong>{label}</strong><span>{object_class} · {html.escape(digest_raw[:12])}</span></button>'
         )
+        client_objects[object_id] = {
+            "label": label_raw,
+            "path": path,
+            "type": object_class,
+            "digest": digest_raw,
+            "version": version_raw,
+        }
 
-    board_label = html.escape(
+    board_label_raw = (
         document["boards"][0]["label"] if document["boards"] else document["canvas_id"]
     )
+    board_label = html.escape(board_label_raw)
+    client_data = json.dumps(
+        {"objects": client_objects, "children": children, "parents": parents},
+        sort_keys=True,
+        separators=(",", ":"),
+    ).replace("<", "\\u003c")
+
     page = f'''<!doctype html>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{board_label} — Canvas</title>
 <style>
 :root {{ color-scheme: dark; font-family: ui-sans-serif, system-ui, sans-serif; }}
+* {{ box-sizing:border-box; }}
 body {{ margin:0; background:#111318; color:#e8ebf0; }}
-header {{ position:sticky; top:0; z-index:5; display:flex; gap:16px; align-items:center; padding:12px 16px; background:#181b22; border-bottom:1px solid #333945; }}
+header {{ position:sticky; top:0; z-index:10; display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:10px 12px; background:#181b22; border-bottom:1px solid #333945; }}
 header strong {{ white-space:nowrap; }}
-header span {{ color:#a8b0bd; white-space:nowrap; }}
-input {{ min-width:260px; flex:1; padding:8px 10px; border:1px solid #444b59; border-radius:8px; background:#101218; color:inherit; }}
-.viewport {{ overflow:auto; height:calc(100vh - 58px); }}
-.board {{ position:relative; width:{max_x}px; height:{max_y}px; background-image:radial-gradient(#2d3340 1px, transparent 1px); background-size:24px 24px; }}
+header .count {{ color:#a8b0bd; white-space:nowrap; font-size:12px; }}
+.toolbar {{ display:flex; flex:1; min-width:280px; gap:6px; align-items:center; }}
+input {{ min-width:180px; flex:1; padding:8px 10px; border:1px solid #444b59; border-radius:8px; background:#101218; color:inherit; font-size:16px; }}
+button {{ color:inherit; font:inherit; }}
+.control {{ min-height:38px; padding:7px 10px; border:1px solid #444b59; border-radius:8px; background:#20242d; cursor:pointer; }}
+.control:disabled {{ opacity:.45; cursor:not-allowed; }}
+.workspace {{ display:grid; grid-template-columns:minmax(0,1fr) 320px; min-height:620px; }}
+.viewport {{ position:relative; overflow:auto; height:calc(100vh - 62px); min-height:560px; cursor:grab; touch-action:pan-x pan-y; }}
+.viewport.dragging {{ cursor:grabbing; user-select:none; }}
+.scale-shell {{ position:relative; }}
+.board {{ position:absolute; left:0; top:0; width:{max_x}px; height:{max_y}px; transform-origin:0 0; background-image:radial-gradient(#2d3340 1px, transparent 1px); background-size:24px 24px; }}
 svg {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }}
-path {{ fill:none; stroke:#505968; stroke-width:1.5; }}
-.card {{ position:absolute; box-sizing:border-box; padding:9px 11px; border:1px solid #3b4350; border-radius:9px; background:#1d212a; overflow:hidden; }}
+.edge {{ fill:none; stroke:#505968; stroke-width:1.5; }}
+.edge.hidden {{ display:none; }}
+.card {{ position:absolute; display:block; box-sizing:border-box; padding:9px 11px; border:1px solid #3b4350; border-radius:9px; background:#1d212a; text-align:left; overflow:hidden; cursor:pointer; }}
 .card.tree {{ border-left:4px solid #8a93a3; }}
 .card.blob {{ border-left:4px solid #596271; }}
 .card strong {{ display:block; font-size:12px; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
 .card span {{ display:block; margin-top:7px; color:#a8b0bd; font-size:10px; }}
-.card.filtered {{ opacity:.07; }}
+.card.hidden {{ display:none; }}
+.card.selected {{ outline:3px solid #c3cad5; outline-offset:2px; }}
+.inspector {{ height:calc(100vh - 62px); min-height:560px; overflow:auto; border-left:1px solid #333945; background:#15181f; padding:16px; }}
+.inspector h2 {{ margin:0 0 12px; font-size:16px; }}
+.inspector dl {{ margin:0; }}
+.inspector dt {{ margin-top:12px; color:#8f98a6; font-size:11px; text-transform:uppercase; letter-spacing:.05em; }}
+.inspector dd {{ margin:4px 0 0; word-break:break-word; font-size:13px; }}
+.context {{ margin-top:16px; border-top:1px solid #303641; padding-top:12px; }}
+.context button {{ width:100%; margin-top:6px; text-align:left; }}
+.context-list {{ max-height:240px; overflow:auto; }}
+.muted {{ color:#8f98a6; }}
+#status {{ min-width:90px; text-align:right; color:#a8b0bd; font-size:12px; }}
+@media (max-width: 820px) {{
+  .workspace {{ grid-template-columns:1fr; }}
+  .viewport {{ height:560px; }}
+  .inspector {{ height:auto; min-height:0; border-left:0; border-top:1px solid #333945; }}
+}}
 </style>
-<header><strong>{board_label}</strong><span>{len(objects)} objects · {len(document["connections"])} connections</span><input id="filter" aria-label="Filter repository paths" placeholder="Filter paths"></header>
-<div class="viewport"><div class="board"><svg viewBox="0 0 {max_x} {max_y}" preserveAspectRatio="none">{''.join(lines)}</svg>{''.join(cards)}</div></div>
+<header>
+  <strong>{board_label}</strong>
+  <span class="count">{len(objects)} objects · {len(document["connections"])} connections</span>
+  <div class="toolbar">
+    <input id="filter" aria-label="Filter repository paths" placeholder="Filter paths">
+    <button type="button" class="control" id="zoom-out" aria-label="Zoom out">−</button>
+    <button type="button" class="control" id="zoom-in" aria-label="Zoom in">+</button>
+    <button type="button" class="control" id="fit">Fit width</button>
+    <button type="button" class="control" id="reset">Reset view</button>
+    <span id="status" aria-live="polite"></span>
+  </div>
+</header>
+<div class="workspace">
+  <div class="viewport" id="viewport" tabindex="0" aria-label="Repository Canvas board">
+    <div class="scale-shell" id="scale-shell" style="width:{max_x}px;height:{max_y}px">
+      <div class="board" id="board">
+        <svg viewBox="0 0 {max_x} {max_y}" preserveAspectRatio="none">{''.join(lines)}</svg>
+        {''.join(cards)}
+      </div>
+    </div>
+  </div>
+  <aside class="inspector" aria-live="polite">
+    <h2 id="detail-title">Repository object</h2>
+    <p id="detail-empty" class="muted">Select a tree or blob on the board.</p>
+    <div id="detail" hidden>
+      <dl>
+        <dt>Path</dt><dd id="detail-path"></dd>
+        <dt>Git object</dt><dd id="detail-type"></dd>
+        <dt>Digest</dt><dd id="detail-digest"></dd>
+        <dt>Pinned revision</dt><dd id="detail-version"></dd>
+      </dl>
+      <div class="context">
+        <button type="button" class="control" id="center-selected">Center selected</button>
+        <button type="button" class="control" id="toggle-subtree">Collapse subtree</button>
+        <button type="button" class="control" id="show-all">Expand all</button>
+      </div>
+      <div class="context">
+        <strong>Parent</strong>
+        <div id="parent-link" class="context-list"></div>
+      </div>
+      <div class="context">
+        <strong>Children</strong>
+        <div id="children-links" class="context-list"></div>
+      </div>
+    </div>
+  </aside>
+</div>
+<script type="application/json" id="graph-data">{client_data}</script>
 <script>
-const input=document.getElementById('filter');
-const cards=[...document.querySelectorAll('.card')];
-input.addEventListener('input',()=>{{
-  const value=input.value.trim().toLowerCase();
-  for(const card of cards) card.classList.toggle('filtered',Boolean(value)&&!card.dataset.label.includes(value));
-}});
+(() => {{
+  const graph = JSON.parse(document.getElementById('graph-data').textContent);
+  const viewport = document.getElementById('viewport');
+  const board = document.getElementById('board');
+  const shell = document.getElementById('scale-shell');
+  const filter = document.getElementById('filter');
+  const status = document.getElementById('status');
+  const cards = [...document.querySelectorAll('.card')];
+  const edges = [...document.querySelectorAll('.edge')];
+  const cardsById = new Map(cards.map(card => [card.dataset.objectId, card]));
+  const allIds = new Set(cardsById.keys());
+  const collapsed = new Set();
+  let selected = null;
+  let scale = 1;
+  const baseWidth = {max_x};
+  const baseHeight = {max_y};
+
+  const detail = document.getElementById('detail');
+  const detailEmpty = document.getElementById('detail-empty');
+  const detailTitle = document.getElementById('detail-title');
+  const detailPath = document.getElementById('detail-path');
+  const detailType = document.getElementById('detail-type');
+  const detailDigest = document.getElementById('detail-digest');
+  const detailVersion = document.getElementById('detail-version');
+  const parentLink = document.getElementById('parent-link');
+  const childrenLinks = document.getElementById('children-links');
+  const toggleSubtree = document.getElementById('toggle-subtree');
+
+  function descendants(id) {{
+    const result = new Set();
+    const queue = [...(graph.children[id] || [])];
+    while (queue.length) {{
+      const current = queue.shift();
+      if (result.has(current)) continue;
+      result.add(current);
+      queue.push(...(graph.children[current] || []));
+    }}
+    return result;
+  }}
+
+  function ancestorClosure(ids) {{
+    const result = new Set(ids);
+    for (const id of [...ids]) {{
+      let current = graph.parents[id];
+      while (current) {{
+        result.add(current);
+        current = graph.parents[current];
+      }}
+    }}
+    return result;
+  }}
+
+  function visibleIds() {{
+    const query = filter.value.trim().toLowerCase();
+    if (query) {{
+      const matches = new Set();
+      for (const [id, meta] of Object.entries(graph.objects)) {{
+        if (meta.path.toLowerCase().includes(query) || meta.label.toLowerCase().includes(query)) matches.add(id);
+      }}
+      return ancestorClosure(matches);
+    }}
+    const hidden = new Set();
+    for (const id of collapsed) for (const child of descendants(id)) hidden.add(child);
+    return new Set([...allIds].filter(id => !hidden.has(id)));
+  }}
+
+  function updateVisibility() {{
+    const visible = visibleIds();
+    for (const card of cards) {{
+      const id = card.dataset.objectId;
+      card.classList.toggle('hidden', !visible.has(id));
+      card.classList.toggle('selected', id === selected);
+    }}
+    for (const edge of edges) {{
+      edge.classList.toggle('hidden', !visible.has(edge.dataset.from) || !visible.has(edge.dataset.to));
+    }}
+    status.textContent = `${{visible.size}} shown`;
+  }}
+
+  function navButton(id) {{
+    const meta = graph.objects[id];
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'control';
+    button.textContent = meta.path;
+    button.addEventListener('click', () => selectObject(id, true));
+    return button;
+  }}
+
+  function renderInspector() {{
+    if (!selected || !graph.objects[selected]) {{
+      detail.hidden = true;
+      detailEmpty.hidden = false;
+      detailTitle.textContent = 'Repository object';
+      return;
+    }}
+    const meta = graph.objects[selected];
+    detail.hidden = false;
+    detailEmpty.hidden = true;
+    detailTitle.textContent = meta.label;
+    detailPath.textContent = meta.path;
+    detailType.textContent = meta.type;
+    detailDigest.textContent = meta.digest;
+    detailVersion.textContent = meta.version;
+
+    parentLink.replaceChildren();
+    const parent = graph.parents[selected];
+    if (parent) parentLink.appendChild(navButton(parent));
+    else parentLink.textContent = 'Repository root';
+
+    childrenLinks.replaceChildren();
+    const children = graph.children[selected] || [];
+    if (children.length) {{
+      for (const child of children) childrenLinks.appendChild(navButton(child));
+    }} else {{
+      childrenLinks.textContent = 'No children';
+    }}
+
+    toggleSubtree.disabled = children.length === 0;
+    toggleSubtree.textContent = collapsed.has(selected) ? 'Expand subtree' : 'Collapse subtree';
+  }}
+
+  function centerSelected() {{
+    if (!selected) return;
+    const card = cardsById.get(selected);
+    if (!card) return;
+    const x = (card.offsetLeft + card.offsetWidth / 2) * scale;
+    const y = (card.offsetTop + card.offsetHeight / 2) * scale;
+    viewport.scrollTo({{
+      left: Math.max(0, x - viewport.clientWidth / 2),
+      top: Math.max(0, y - viewport.clientHeight / 2),
+      behavior: 'smooth'
+    }});
+  }}
+
+  function selectObject(id, center = false) {{
+    selected = id;
+    updateVisibility();
+    renderInspector();
+    if (center) centerSelected();
+  }}
+
+  function setScale(next) {{
+    scale = Math.max(0.2, Math.min(2.5, next));
+    board.style.transform = `scale(${{scale}})`;
+    shell.style.width = `${{baseWidth * scale}}px`;
+    shell.style.height = `${{baseHeight * scale}}px`;
+    status.textContent = `${{visibleIds().size}} shown · ${{Math.round(scale * 100)}}%`;
+  }}
+
+  for (const card of cards) card.addEventListener('click', () => selectObject(card.dataset.objectId));
+  filter.addEventListener('input', updateVisibility);
+  document.getElementById('zoom-out').addEventListener('click', () => setScale(scale / 1.2));
+  document.getElementById('zoom-in').addEventListener('click', () => setScale(scale * 1.2));
+  document.getElementById('fit').addEventListener('click', () => setScale(Math.min(1, (viewport.clientWidth - 24) / baseWidth)));
+  document.getElementById('reset').addEventListener('click', () => {{
+    filter.value = '';
+    collapsed.clear();
+    selected = null;
+    setScale(1);
+    viewport.scrollTo({{left:0, top:0}});
+    updateVisibility();
+    renderInspector();
+  }});
+  document.getElementById('center-selected').addEventListener('click', centerSelected);
+  toggleSubtree.addEventListener('click', () => {{
+    if (!selected) return;
+    if (collapsed.has(selected)) collapsed.delete(selected); else collapsed.add(selected);
+    updateVisibility();
+    renderInspector();
+  }});
+  document.getElementById('show-all').addEventListener('click', () => {{
+    collapsed.clear();
+    filter.value = '';
+    updateVisibility();
+    renderInspector();
+  }});
+
+  let drag = null;
+  viewport.addEventListener('pointerdown', event => {{
+    if (event.target.closest('.card,button,input')) return;
+    drag = {{x:event.clientX, y:event.clientY, left:viewport.scrollLeft, top:viewport.scrollTop}};
+    viewport.classList.add('dragging');
+    viewport.setPointerCapture(event.pointerId);
+  }});
+  viewport.addEventListener('pointermove', event => {{
+    if (!drag) return;
+    viewport.scrollLeft = drag.left - (event.clientX - drag.x);
+    viewport.scrollTop = drag.top - (event.clientY - drag.y);
+  }});
+  function endDrag(event) {{
+    if (!drag) return;
+    drag = null;
+    viewport.classList.remove('dragging');
+    if (viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
+  }}
+  viewport.addEventListener('pointerup', endDrag);
+  viewport.addEventListener('pointercancel', endDrag);
+
+  updateVisibility();
+  renderInspector();
+}})();
 </script>
 '''
     Path(output).write_text(page, encoding="utf-8")
