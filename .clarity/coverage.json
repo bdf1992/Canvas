@@ -1,0 +1,11 @@
+{
+  "reviews": {
+    "README.md": {
+      "artifact_digest": "sha256:d059dd84450188fa4fa17d3d857e4ae4551af55c06c7b66912efc2e3be52acc8",
+      "basis": [],
+      "changed": false
+    }
+  },
+  "schema": "soveraeign-clarity-coverage/v1",
+  "skill": "clarity/v1"
+}
