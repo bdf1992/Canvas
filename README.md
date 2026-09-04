@@ -137,3 +137,20 @@ Canvas core
 ```
 
 See [SPEC.md](SPEC.md) for the contract, [DESIGN.md](DESIGN.md) for the interaction philosophy, and [ROADMAP.md](ROADMAP.md) for the progression to 1.0.
+
+<!-- lineage:begin — generated from system-cartographer lineage/lineage.yaml. Do not hand-edit. -->
+
+## Where this sits
+
+This is one of 20 repositories on this account whose relations are recorded, with the evidence for each, in [`lineage.yaml`](https://github.com/bdf1992/system-cartographer/blob/claude/access-requirements-zbl1s7/lineage/lineage.yaml). What that record says about this one:
+
+**Claim.** Arranges addressable things in space, relates them visibly, and wires a subset into executable circuits.
+
+**Checked.** `python -m pytest -q` — 30 passed, observed 2026-09-04.
+
+**Relations.**
+
+- `schematically` **supersedes** this repository. Stated by the owner, 2026-09-04. No textual link exists between the two repositories, and their vocabularies are disjoint: Canvas uses Board, Frame, Card and Grounded Field; schematically uses Component, Wire, Part and signal. What corroborates the claim is overlapping purpose — both arrange things in space and wire them together — and relative activity: schematically has 59 commits and is current, Canvas has 20. schematically's CANVAS-MODEL.md is not evidence; it uses "canvas" as a model property and names none of Canvas's terms.
+- `soveraeign` **may provide substrate to** this repository. Canvas/README.md:5 says integrations such as Soveraeign "may provide stronger grounding, execution, custody, provenance, authority, and evidence, but they are providers of those semantics rather than prerequisites for Canvas itself". The dependency is optional and Canvas is built to work without it: TASK-2.md:38 records "no Soveraeign dependency" and WITNESS.md:3 proves the contract without it.
+
+<!-- lineage:end -->
