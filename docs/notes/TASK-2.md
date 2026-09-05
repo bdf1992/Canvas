@@ -38,4 +38,4 @@ Calling the result a “Directory Board” describes the human reading of the co
 - no Soveraeign dependency;
 - no Circuit semantics.
 
-The current acceptance surface is defined by `FIRST-BOARD.md`, `DESIGN.md`, and `board_view.py`.
+The current acceptance surface is defined by `FIRST-BOARD.md`, `../../DESIGN.md`, and `../../board_view.py`.
